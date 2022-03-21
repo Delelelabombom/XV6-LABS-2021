@@ -97,6 +97,22 @@ allocpid() {
   return pid;
 }
 
+// number of processes whose state is not UNUSED
+int
+getnproc(void)
+{
+  struct proc *p;
+  int nproc = 0;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state != UNUSED) {
+      nproc++;
+    }
+    release(&p->lock);
+  }
+  return nproc;
+}
+
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
@@ -164,6 +180,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  // clear tracemask
+  //p->tracemask = 0;
 }
 
 // Create a user page table for a given process,
@@ -244,6 +262,9 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  // initial tracemask
+  //p->tracemask = 0;
+
   release(&p->lock);
 }
 
@@ -288,6 +309,9 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  // copy tracemask
+  np->tracemask = p->tracemask;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);

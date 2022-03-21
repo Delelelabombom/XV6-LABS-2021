@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -94,4 +95,89 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+//#include "user/user.h"
+//extern int trace(int mask, char *argv[]);
+
+uint64
+sys_trace(void)
+{
+  int mask;
+  if(argint(0, &mask) < 0){
+    return -1;
+  }
+  myproc()->tracemask = mask;
+  return 0;
+
+//   int mask; char *argv[MAXARG];
+//   int i;
+//   uint64 uargv, uarg;
+//   printf("please specify the masssssssk!\n");
+
+//   if(argint(0, &mask) < 0 || argaddr(1, &uargv) < 0){
+//     return -1;
+//   }
+//   memset(argv, 0, sizeof(argv));
+//   for(i=0;; i++){
+//     if(i >= NELEM(argv)){
+//       goto bad;
+//     }
+//     if(fetchaddr(uargv+sizeof(uint64)*i, (uint64*)&uarg) < 0){
+//       goto bad;
+//     }
+//     if(uarg == 0){
+//       argv[i] = 0;
+//       break;
+//     }
+//     argv[i] = kalloc();
+//     if(argv[i] == 0)
+//       goto bad;
+//     if(fetchstr(uarg, argv[i], PGSIZE) < 0)
+//       goto bad;
+//   }
+
+//   myproc()->tracemask = mask;
+  
+//   if (fork() == 0)
+//   {
+//     exec();
+  
+//   }
+  
+
+//   //int ret = trace(mask, argv);
+//   int ret = 55;
+
+//   for(i = 0; i < NELEM(argv) && argv[i] != 0; i++)
+//     kfree(argv[i]);
+
+//   return ret;
+
+//  bad:
+//   for(i = 0; i < NELEM(argv) && argv[i] != 0; i++)
+//     kfree(argv[i]);
+//   return -1;
+
+}
+
+uint64
+sys_sysinfo(void)
+{
+  uint64 addr;
+  if (argaddr(0, &addr) < 0)
+    return -1;
+  struct proc *p = myproc();
+  struct sysinfo s;
+  //printf("sysinfo the masssssssk111111111!\n");
+  s.freemem = kfreemem();
+  //printf("sysinfo the masssssssk222222222!\n");
+  s.nproc = getnproc();
+  //printf("sysinfo the masssssssk3333333333!\n");
+  if (copyout(p->pagetable, addr, (char *)&s, sizeof(s)) < 0)
+    return -1;
+  //printf("sysinfo the masssssssk44444444444!\n");
+  //printf("sysinfo the masssssssk!\n");
+  return 0;
+  
 }
