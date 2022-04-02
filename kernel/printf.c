@@ -122,6 +122,7 @@ panic(char *s)
   printf(s);
   printf("\n");
   panicked = 1; // freeze uart output from other CPUs
+  backtrace();
   for(;;)
     ;
 }
@@ -131,4 +132,21 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+void            
+backtrace(void)
+{
+  printf("backtrace:\n");
+  uint64 sfaddr = r_fp();  //stack frame address
+  uint64 sfup = PGROUNDUP(sfaddr);
+
+  while (sfaddr != sfup)
+  {
+    printf("%p\n", *((uint64 *)(sfaddr - 8)));
+    sfaddr = *((uint64 *)(sfaddr - 16));
+  }
+  // main函数无需打印
+  //printf("%x\n", *((uint64 *)(sfaddr - 8)));
+  
 }
