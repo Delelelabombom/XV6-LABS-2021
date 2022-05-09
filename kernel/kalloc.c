@@ -9,7 +9,8 @@
 #include "riscv.h"
 #include "defs.h"
 
-void freerange(void *pa_start, void *pa_end);
+void freerange(void *pa_start, void *pa_end, int cid);
+void kfreewithcid(void *pa, int cid);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
@@ -23,20 +24,38 @@ struct {
   struct run *freelist;
 } kmem;
 
+struct cmem
+{
+  struct spinlock lock;
+  struct run *freelist;
+} ;
+
+struct cmem cmemlist[NCPU] ;
+
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  // initlock(&kmem.lock, "kmem");
+  // freerange(end, (void*)PHYSTOP);
+  int gap = 128 * 1024 * 1024 / NCPU;
+  void *laddr = (void*)end;
+  void *raddr = (void*)(KERNBASE + gap);
+  for (int i = 0; i < NCPU; i++){
+    initlock(&(cmemlist->lock), "kmem");
+    freerange(laddr, raddr, i);
+    laddr = raddr;
+    raddr += gap;
+  }
+  
 }
 
 void
-freerange(void *pa_start, void *pa_end)
+freerange(void *pa_start, void *pa_end, int cid)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
-    kfree(p);
+    kfreewithcid((void *)p, cid);
 }
 
 // Free the page of physical memory pointed at by v,
@@ -44,7 +63,7 @@ freerange(void *pa_start, void *pa_end)
 // call to kalloc().  (The exception is when
 // initializing the allocator; see kinit above.)
 void
-kfree(void *pa)
+kfreewithcid(void *pa, int cid)
 {
   struct run *r;
 
@@ -56,10 +75,19 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  acquire(&cmemlist[cid].lock);
+  r->next = cmemlist[cid].freelist;
+  cmemlist[cid].freelist = r;
+  release(&cmemlist[cid].lock);
+}
+
+void
+kfree(void *pa)
+{
+  push_off();
+  int cid = cpuid();
+  pop_off();
+  kfreewithcid(pa, cid);
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -69,12 +97,32 @@ void *
 kalloc(void)
 {
   struct run *r;
-
-  acquire(&kmem.lock);
-  r = kmem.freelist;
+  push_off();
+  int cid = cpuid(); 
+  pop_off();
+  acquire(&cmemlist[cid].lock);
+  r = cmemlist[cid].freelist;
   if(r)
-    kmem.freelist = r->next;
-  release(&kmem.lock);
+    cmemlist[cid].freelist = r->next;
+  else{
+    for (int i = 0; i < NCPU; i++)
+    {
+      if (i == cid)
+        continue;
+      struct run *r1;
+      acquire(&cmemlist[i].lock);
+      r1 = cmemlist[i].freelist;
+      if (r1)
+      {
+        cmemlist[i].freelist = r1->next;
+        r = r1;
+        release(&cmemlist[i].lock);
+        break;
+      }
+      release(&cmemlist[i].lock);
+    }
+  }
+  release(&cmemlist[cid].lock);
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk

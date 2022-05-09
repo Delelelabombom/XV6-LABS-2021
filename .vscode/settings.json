@@ -1,0 +1,23 @@
+{
+    "C_Cpp.errorSquiggles": "Disabled",
+    "files.associations": {
+        "*.tcc": "c",
+        "optional": "c",
+        "algorithm": "c",
+        "random": "c",
+        "istream": "c",
+        "numeric": "c",
+        "streambuf": "c",
+        "array": "c",
+        "string": "c",
+        "vector": "c",
+        "string_view": "c",
+        "functional": "c",
+        "limits": "c",
+        "ostream": "c",
+        "ratio": "c",
+        "sstream": "c",
+        "cstdio": "c",
+        "typeinfo": "c"
+    }
+}
